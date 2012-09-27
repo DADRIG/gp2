@@ -16,6 +16,8 @@ CGameApplication::CGameApplication(void)
 	m_pSwapChain=NULL;
 	m_pEffect=NULL;
 	m_pTechnique=NULL;
+	m_pDepthStencilView;
+	m_pDepthStencilTexture;
 }
 
 CGameApplication::~CGameApplication(void)
@@ -31,6 +33,10 @@ CGameApplication::~CGameApplication(void)
 		m_pEffect->Release();
 	if (m_pRenderTargetView)
 		m_pRenderTargetView->Release();
+	if(m_pDepthStencilTexture)
+		m_pDepthStencilTexture->Release();
+	if(m_pDepthStencilView)
+		m_pDepthStencilView->Release();
 	if (m_pSwapChain)
 		m_pSwapChain->Release();
 	if (m_pD3D10Device)
@@ -66,7 +72,7 @@ bool CGameApplication::initGame()
 #endif
 	//Create the effect - BMD
 	//http://msdn.microsoft.com/en-us/library/bb172658%28v=vs.85%29.aspx -BMD
-	if( FAILED(D3DX10CreateEffectFromFile( TEXT("ScreenSpace.fx"), //The filename of the effect - BMD
+	if( FAILED(D3DX10CreateEffectFromFile( TEXT("Transform.fx"), //The filename of the effect - BMD
 		NULL, //An array of shader macros we leave this NULL - BMD
 		NULL, //ID3D10Include*, this allows to include other files when we are compiling the effect - BMD
 		"fx_4_0", //A string which specfies the effect profile to use, in this case fx_4_0(Shader model 4) - BMD
@@ -172,6 +178,29 @@ bool CGameApplication::initGame()
     //http://msdn.microsoft.com/en-us/library/bb173590%28v=VS.85%29.aspx - BMD
     m_pD3D10Device->IASetPrimitiveTopology( D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST );	
 	return true;
+
+	D3DXVECTOR3 cameraPos(0.0f,0.0f,-10.0f);
+	D3DXVECTOR3 cameraLook(0.0f,0.0f,1.0f);
+	D3DXVECTOR3 cameraUp(0.0f,1.0f,0.0f);
+	D3DXMatrixLookAtLH(&m_matView,&cameraPos,&cameraLook,&cameraUp);
+
+	D3D10_VIEWPORT vp;
+	UINT numViewPorts=1;
+	m_pD3D10Device->RSGetViewports(&numViewPorts,&vp);
+
+	D3DXMatrixPerspectiveFovLH(&m_matProjection,(float)D3DX_PI*0.25f,vp.Width/(FLOAT)vp.Height,0.1f,100.0f);
+
+	m_pViewMatrixVariable = m_pEffect->GetVariableByName("matView")->AsMatrix();
+	m_pProjectionMatrixVariable = m_pEffect->GetVariableByName("matProjection")->AsMatrix();
+
+
+	m_pProjectionMatrixVariable->SetMatrix((float*)m_matProjection);
+
+	m_vecPosition = D3DXVECTOR3(0.0f,0.0f,0.0f);
+	m_vecScale=D3DXVECTOR3(1.0f,1.0f,1.0f);
+	m_vecRotation=D3DXVECTOR3(0.0f,0.0f,0.0f);
+	m_pWorldMatrixVariable = m_pEffect->GetVariableByName("matWorld")->AsMatrix();
+
 }
 
 void CGameApplication::run()
@@ -194,10 +223,15 @@ void CGameApplication::render()
 	//Clear the Render Target
 	//http://msdn.microsoft.com/en-us/library/bb173539%28v=vs.85%29.aspx - BMD
     m_pD3D10Device->ClearRenderTargetView( m_pRenderTargetView, ClearColor );
+	m_pD3D10Device->ClearDepthStencilView(m_pDepthStencilView,D3D10_CLEAR_DEPTH,1.0f,0);
 	//All drawing will occur between the clear and present - BMD
 	 
 	//Get the Description of the technique, we need this in order to
 	//loop through each pass in the technique - BMD
+	m_pViewMatrixVariable->SetMatrix((float*)m_matView);
+
+	m_pWorldMatrixVariable->SetMatrix((float*)m_matWorld);
+
     D3D10_TECHNIQUE_DESC techDesc;
     m_pTechnique->GetDesc( &techDesc );
 	//Loop through the passes in the technique - BMD
@@ -216,6 +250,14 @@ void CGameApplication::render()
 
 void CGameApplication::update()
 {
+	D3DXMatrixScaling(&m_matScale,m_vecScale.x,m_vecScale.y,m_vecScale.z);
+	D3DXMatrixRotationYawPitchRoll(&m_matRotation,m_vecRotation.y,m_vecRotation.x,m_vecRotation.z);
+	D3DXMatrixTranslation(&m_matTranslation,m_vecPosition.x,m_vecPosition.y,m_vecPosition.z);
+
+	D3DXMatrixMultiply(&m_matWorld,&m_matScale,&m_matRotation);
+	D3DXMatrixMultiply(&m_matWorld,&m_matWorld,&m_matTranslation);
+
+
 }
 
 //initGraphics - initialise the graphics subsystem - BMD
@@ -306,6 +348,7 @@ bool CGameApplication::initGraphics()
 							   //can return back different types dependent on the 2nd param
 		return false;
 
+
 	//Create the Render Target View, a view is the way we access D3D10 resources
 	//http://msdn.microsoft.com/en-us/library/bb173556%28v=vs.85%29.aspx - BMD
 	if (FAILED(m_pD3D10Device->CreateRenderTargetView( pBackBuffer, //The resource we are creating the view for - BMD
@@ -319,11 +362,36 @@ bool CGameApplication::initGraphics()
 	//The above Get Buffer call will allocate some memory, we now need to release it. - BMD
     pBackBuffer->Release();
 
+	D3D10_TEXTURE2D_DESC descDepth;
+	descDepth.Width = width;
+	descDepth.Height = height;
+	descDepth.MipLevels = 1;
+	descDepth.ArraySize = 1;
+	descDepth.Format = DXGI_FORMAT_D32_FLOAT;
+	descDepth.SampleDesc.Count = 1;
+	descDepth.SampleDesc.Quality = 0;
+	descDepth.Usage = D3D10_USAGE_DEFAULT;
+	descDepth.BindFlags = D3D10_BIND_DEPTH_STENCIL;
+	descDepth.CPUAccessFlags = 0;
+	descDepth.MiscFlags = 0;
+
+	if(FAILED(m_pD3D10Device->CreateTexture2D(&descDepth,NULL,&m_pDepthStencilTexture)))
+
+		return false;
+
+	D3D10_DEPTH_STENCIL_VIEW_DESC descDSV;
+	descDSV.Format = descDepth.Format;
+	descDSV.ViewDimension = D3D10_DSV_DIMENSION_TEXTURE2D;
+	descDSV.Texture2D.MipSlice = 0;
+
+	if(FAILED(m_pD3D10Device->CreateDepthStencilView(m_pDepthStencilTexture, &descDSV, &m_pDepthStencilView)))
+		return false;
+
 	//Binds one or more render targets and depth buffer to the Output merger stage - BMD
 	//http://msdn.microsoft.com/en-us/library/bb173597%28v=vs.85%29.aspx - BMD
 	m_pD3D10Device->OMSetRenderTargets(1, //Number  of views - BMD
 		&m_pRenderTargetView, //pointer to an array of D3D10 Render Target Views - BMD
-		NULL); //point to Depth Stencil buffer - BMD
+		m_pDepthStencilView); //point to Depth Stencil buffer - BMD
 
     // Setup the viewport 
 	//http://msdn.microsoft.com/en-us/library/bb172500%28v=vs.85%29.aspx - BMD
