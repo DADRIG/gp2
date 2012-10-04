@@ -10,13 +10,13 @@ public:
 	~CGameApplication(void);
 	bool init();
 	void run();
-private:
+public:
 	bool initGame();
 	bool initGraphics();
 	bool initWindow();
 	void render();
 	void update();
-private:
+public:
 	ID3D10Device * m_pD3D10Device;
 	IDXGISwapChain * m_pSwapChain;
 	ID3D10RenderTargetView * m_pRenderTargetView;
@@ -29,6 +29,10 @@ private:
 		//Vertex Buffer - BMD
 	ID3D10Buffer*           m_pVertexBuffer;
 	ID3D10InputLayout*      m_pVertexLayout;
+
+	ID3D10Buffer*           m_pIndexBuffer;
+	
+
 
 	//Effect - BMD
 	ID3D10Effect*           m_pEffect;

@@ -129,12 +129,7 @@ bool CGameApplication::initGame()
     m_pD3D10Device->IASetInputLayout( m_pVertexLayout );
 
     // Some vertices - BMD
-    Vertex vertices[] =
-    {
-        D3DXVECTOR3( 0.0f, 0.5f, 0.5f ),
-        D3DXVECTOR3( 0.5f, -0.5f, 0.5f ),
-        D3DXVECTOR3( -0.5f, -0.5f, 0.5f ),
-    };
+    
     
     //The description of the Buffer, this is a common pattern you will see when
     //creating memory buffer in D3D10, this is an example of how to create a
@@ -147,19 +142,55 @@ bool CGameApplication::initGame()
     bd.CPUAccessFlags = 0;//CPUAccessFlag, sepcfies if the CPU can access the resource. 0 means no CPU access - BMD
     bd.MiscFlags = 0;//MiscCreation flags, this will be zero most of the time - BMD
     
-    //This is used to supply the initial data for the buffer - BMD
+	
+	Vertex vertices[] =
+	
+	{
+		D3DXVECTOR3(0.0f, 0.5f, 0.5f),
+		D3DXVECTOR3(0.0f,-0.5f,0.5f),
+		D3DXVECTOR3(-0.5f,-0.5f,0.5f),
+		D3DXVECTOR3(-0.5f,0.5f,0.5f),
+		D3DXVECTOR3(0.5f,0.5f,-0.5f),
+		D3DXVECTOR3(0.5f,-0.5f,-0.5f),
+		D3DXVECTOR3(-0.5f,-0.5f,-0.5f),
+		D3DXVECTOR3(-0.5f,0.5f,-0.5f),
+	};
+
+	//This is used to supply the initial data for the buffer - BMD
     //http://msdn.microsoft.com/en-us/library/bb172456%28VS.85%29.aspx - BMD
     D3D10_SUBRESOURCE_DATA InitData;
     //A pointer to the initial data
     InitData.pSysMem = vertices;
-    
-    //Create the Buffer using the buffer description and initial data - BMD
+
+	 //Create the Buffer using the buffer description and initial data - BMD
     //http://msdn.microsoft.com/en-us/library/bb173544%28v=VS.85%29.aspx - BMD
     if (FAILED(m_pD3D10Device->CreateBuffer( 
 		&bd, //Memory address of a buffer description - BMD
 		&InitData, //Memory address of the initial data - BMD
 		&m_pVertexBuffer )))//A pointer to a memory address of a buffer, this will be initialise after - BMD
 		return false;
+	
+	int indices[] = {0,1,2,3};
+
+
+	 D3D10_BUFFER_DESC indexBufferDesc;
+    indexBufferDesc.Usage = D3D10_USAGE_DEFAULT;//Usuage flag,this describes how the buffer is read/written to. Default is the most common - BMD
+    indexBufferDesc.ByteWidth = sizeof( int ) * 8;//The size of the buffer, this is the size of one vertex * by the num of vertices -BMD
+    indexBufferDesc.BindFlags = D3D10_BIND_INDEX_BUFFER;//BindFlags, says how the buffer is going to be used. In this case as a Vertex Buffer - BMD
+    indexBufferDesc.CPUAccessFlags = 0;//CPUAccessFlag, sepcfies if the CPU can access the resource. 0 means no CPU access - BMD
+    indexBufferDesc.MiscFlags = 0;//MiscCreation flags, this will be zero most of the time - BMD
+
+	
+		
+		InitData.pSysMem = indices;
+
+
+		if (FAILED(m_pD3D10Device->CreateBuffer( 
+		&bd, //Memory address of a buffer description - BMD
+		&InitData, //Memory address of the initial data - BMD
+		&m_pIndexBuffer )))//A pointer to a memory address of a buffer, this will be initialise after - BMD
+		return false;
+
 
     //Get the stride(size) of the a vertex, we need this to tell the pipeline the size of one vertex - BMD
     UINT stride = sizeof( Vertex );
